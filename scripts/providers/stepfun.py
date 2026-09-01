@@ -138,7 +138,7 @@ class StepFunProvider(BaseProvider):
             path=out_path,
             provider=NAME,
             model=model,
-            usage=resp.usage.model_dump() if hasattr(resp, "usage") else None,
+            usage=resp.usage.model_dump() if getattr(resp, "usage", None) is not None else None,
         )
 
     def edit(
@@ -199,5 +199,5 @@ class StepFunProvider(BaseProvider):
             path=out_path,
             provider=NAME,
             model=model,
-            usage=resp.usage.model_dump() if hasattr(resp, "usage") else None,
+            usage=resp.usage.model_dump() if getattr(resp, "usage", None) is not None else None,
         )

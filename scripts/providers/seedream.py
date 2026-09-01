@@ -106,6 +106,11 @@ class SeedreamProvider(BaseProvider):
     default_model = "doubao-seedream-5-0-pro-260628"
     default_size = "2K"
 
+    def default_model_for_call(self) -> str:
+        # Volcengine Ark routes calls through a user-provisioned endpoint id
+        # (ep-...), not the bare model name. Default to the configured endpoint.
+        return _endpoint()
+
     def generate(
         self,
         prompt: str,

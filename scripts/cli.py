@@ -113,7 +113,7 @@ def _seedream_kwargs(args: argparse.Namespace) -> dict:
 
 def cmd_generate(args: argparse.Namespace) -> None:
     p = get(args.provider)
-    model = args.model or p.default_model
+    model = args.model or p.default_model_for_call()
     size = args.size or p.default_size
     sdkw = _seedream_kwargs(args)
 
@@ -151,7 +151,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
 
 def cmd_edit(args: argparse.Namespace) -> None:
     p = get(args.provider)
-    model = args.model or p.default_model
+    model = args.model or p.default_model_for_call()
     size = args.size or p.default_size
 
     if args.dry_run:

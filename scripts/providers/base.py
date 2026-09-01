@@ -30,6 +30,16 @@ class BaseProvider(ABC):
     def edit(self, image: Path, prompt: str, **kwargs: Any) -> ImageResult:
         raise NotImplementedError
 
+    def default_model_for_call(self) -> str:
+        """Model id used when the caller does not pass --model.
+
+        Defaults to the class-level default_model. Providers whose API routes
+        through a user-provisioned endpoint (e.g. Volcengine Ark Seedream,
+        where the real callable id is an `ep-...` endpoint, not the bare model
+        name) should override this to return the configured endpoint.
+        """
+        return self.default_model
+
 
 def guard_overwrite(path: Path, force: bool) -> None:
     """Refuse to silently overwrite an existing file unless --force is given.
