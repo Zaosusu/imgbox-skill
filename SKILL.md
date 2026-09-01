@@ -1,9 +1,10 @@
 ---
 name: 百宝箱生图
 description: >
-  聚合多家生图模型的一站式入口（百宝箱）：内置 StepFun / 火山方舟 Seedream，并支持任意 OpenAI 兼容生图接口。
+  聚合多家生图模型 + AI 抠图的一站式入口（百宝箱）：内置 StepFun / 火山方舟 Seedream，
+  支持任意 OpenAI 兼容生图接口，以及基于 U²-Net 的本地 AI 抠图。
   当用户要生成、编辑、修改图片（概念图、海报、宣传物料、展位视觉、产品 mockup），
-  或说"生成图片 / 出图 / 画图 / 用 seedream / 用 stepfun"时优先调用本 skill。
+  或说"生成图片 / 出图 / 画图 / 用 seedream / 用 stepfun / 抠图 / 去背景"时优先调用本 skill。
   配置内嵌在 skill 目录内，不散落用户根目录，开箱即用。
 ---
 
@@ -22,6 +23,7 @@ description: >
 | `stepfun` | StepFun Step Plan（OpenAI 兼容），支持生图 + 图编辑 | `pip install openai httpx` |
 | `seedream` | 火山方舟 doubao-seedream-5-0-pro，支持生图 | 无（纯标准库） |
 | `openai` | **通用钥匙**：任意 OpenAI 兼容生图接口，填 base-url 即用 | `pip install openai httpx` |
+| `removebg` | **AI 抠图**：U²-Net（rembg），本地运行，输出透明 PNG | `pip install rembg onnxruntime pillow` |
 
 > `openai` 是"集成各大生图公司"的关键：只要对方提供 OpenAI 兼容的
 > `/images/generations` `/images/edits`，填个 base-url 就能接，不用写新代码。
@@ -78,6 +80,10 @@ python scripts/cli.py edit "input.png" "只把蒙版区域换成鲜花" --mask "
 
 # 只校验参数不真调 API
 python scripts/cli.py generate "test" --provider openai --dry-run
+
+# AI 抠图（去除背景，输出带透明通道的 PNG）
+python scripts/cli.py removebg photo.png --out photo_nobg.png
+python scripts/cli.py removebg a.png b.png c.png --out nobg/          # 批量抠图到目录
 ```
 
 ## 隐私：上传用户图片前必须确认
@@ -125,6 +131,7 @@ Avoid: no watermark, no unintended text
 6. 视觉质量重要时，生成后**亲自看一眼图**。
 7. 汇报保存路径，并说明用的是哪个 provider。
 8. 不要覆盖已存在的文件，除非用户明确要求替换。
+9. 需要抠图时用 `removebg`（本地运行、无需 API），输出带 alpha 的 PNG；支持批量。
 
 ## 命令与参数
 
@@ -134,6 +141,7 @@ python scripts/cli.py doctor                    # 配置体检
 python scripts/cli.py configure --provider <名> [--base-url <url>] [--api-key <k>] [--update-key] [--clear]
 python scripts/cli.py generate "<prompt>" --provider <名> [--model] [--size] [--out] [--dry-run]
 python scripts/cli.py edit "<图>" "<prompt>" --provider <名> [--mask <蒙版>] [--out] [--dry-run]
+python scripts/cli.py removebg <图片> [--model u2netp] [--out] [--force]   # AI 抠图
 ```
 
 各厂商默认 model / size：
@@ -200,13 +208,16 @@ imgbox-skill/
 │       ├── seedream.json            # ← 你的 Key（不进 git，configure 生成）
 │       └── openai.json             # ← base-url + Key（不进 git，configure 生成）
 ├── scripts/
-│   ├── cli.py               # 统一入口：list / doctor / configure / generate / edit
+│   ├── cli.py               # 统一入口：list / doctor / configure / generate / edit / removebg
 │   ├── config_store.py      # 配置读写 + 占位符检测
 │   └── providers/
 │       ├── base.py          # 抽象基类
 │       ├── stepfun.py
 │       ├── seedream.py
 │       └── openai.py        # 通用 OpenAI 兼容（接任意厂商）
+├── models/                  # 本地 AI 模型（不入 git）
+│   └── u2netp/
+│       └── u2netp.onnx     # U²-Net 轻量抠图模型（4.5MB）
 ├── references/
 │   ├── vendors.md           # ← 各大生图厂商 base-url / 模型速查
 │   ├── stepfun.md

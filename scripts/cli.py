@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from providers import get, available
+from providers.base import guard_overwrite
 import config_store
 
 
@@ -208,6 +210,53 @@ def cmd_edit(args: argparse.Namespace) -> None:
     _print_result(result)
 
 
+def _resolve_removebg_out(out: "str | None", p: Path, n: int) -> Path:
+    if out:
+        op = Path(out)
+        if n > 1 or op.is_dir():
+            op.mkdir(parents=True, exist_ok=True)
+            return op / f"{p.stem}_nobg.png"
+        return op
+    return p.parent / f"{p.stem}_nobg.png"
+
+
+def cmd_removebg(args: argparse.Namespace) -> None:
+    """AI 抠图：基于 U²-Net（rembg）去除背景，输出带透明通道的 PNG。"""
+    try:
+        from PIL import Image
+        from rembg import new_session, remove
+    except ImportError:
+        raise SystemExit(
+            "缺少依赖：rembg / onnxruntime / Pillow\n"
+            "请先安装：pip install -r requirements.txt"
+        )
+
+    # 优先使用 skill 内置模型目录（models/u2netp/u2netp.onnx），否则回退 rembg 默认
+    skill_root = Path(__file__).resolve().parents[1]
+    local_model = skill_root / "models" / "u2netp" / "u2netp.onnx"
+    if local_model.exists():
+        os.environ.setdefault("U2NET_HOME", str(skill_root))
+
+    model = args.model or "u2netp"
+    try:
+        session = new_session(model)
+    except Exception as e:
+        raise SystemExit(f"加载 rembg 模型失败（{model}）：{e}")
+    inputs = args.image
+    for img_path in inputs:
+        p = Path(img_path)
+        if not p.exists():
+            print(f"跳过（文件不存在）: {img_path}")
+            continue
+        im = Image.open(p).convert("RGB")
+        out_im = remove(im, session=session)  # 返回带 alpha 的 PIL.Image (RGBA)
+        out_path = _resolve_removebg_out(args.out, p, len(inputs))
+        guard_overwrite(out_path, args.force)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_im.save(out_path)
+        print(f"已保存: {out_path}  (model: {model})")
+
+
 def cmd_list(_: argparse.Namespace) -> None:
     print("可用生图厂商：\n")
     for name in available():
@@ -281,6 +330,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_edit.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
     p_edit.add_argument("--dry-run", action="store_true", help="只打印请求体，不调用 API")
 
+    p_rm = sub.add_parser("removebg", help="AI 抠图（rembg / U²-Net）")
+    p_rm.add_argument("image", nargs="+", help="输入图片路径（可多张）")
+    p_rm.add_argument("--model", default="u2netp",
+                      help="rembg 模型名，默认 u2netp（轻量小模型，skill 已内置）")
+    p_rm.add_argument("--out", default=None, help="输出路径；多张时作为输出目录")
+    p_rm.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
+
     return parser
 
 
@@ -292,6 +348,7 @@ def main() -> None:
         "configure": cmd_configure,
         "generate": cmd_generate,
         "edit": cmd_edit,
+        "removebg": cmd_removebg,
     }
     handlers[args.command](args)
 
