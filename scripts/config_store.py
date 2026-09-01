@@ -1,4 +1,4 @@
-"""Configuration store for image-gen providers.
+"""Configuration store for imgbox providers.
 
 Design notes:
 - Config lives INSIDE the skill at config/providers/<name>.json (not the user home root).

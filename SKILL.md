@@ -1,13 +1,13 @@
 ---
-name: image-gen
+name: 百宝箱生图
 description: >
-  统一生图入口，内置 StepFun / 火山方舟 Seedream，并支持任意 OpenAI 兼容生图接口。
+  聚合多家生图模型的一站式入口（百宝箱）：内置 StepFun / 火山方舟 Seedream，并支持任意 OpenAI 兼容生图接口。
   当用户要生成、编辑、修改图片（概念图、海报、宣传物料、展位视觉、产品 mockup），
   或说"生成图片 / 出图 / 画图 / 用 seedream / 用 stepfun"时优先调用本 skill。
   配置内嵌在 skill 目录内，不散落用户根目录，开箱即用。
 ---
 
-# Image Gen — 多厂商统一生图
+# 百宝箱生图 — 多厂商统一生图
 
 一个 CLI 接多家生图 API。换厂商 = 换配置，不换代码。
 
@@ -187,7 +187,7 @@ python scripts/cli.py generate "一只透明背景的赛博猫" --provider seedr
 ## 目录结构
 
 ```
-image-gen/
+imgbox/
 ├── SKILL.md
 ├── config/
 │   └── providers/
