@@ -187,7 +187,7 @@ python scripts/cli.py generate "一只透明背景的赛博猫" --provider seedr
 ## 目录结构
 
 ```
-imgbox/
+imgbox-skill/
 ├── SKILL.md
 ├── config/
 │   └── providers/

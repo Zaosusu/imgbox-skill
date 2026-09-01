@@ -201,7 +201,7 @@ def cmd_list(_: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="imgbox",
+        prog="imgbox-skill",
         description="统一生图 CLI（多厂商，StepFun / Seedream / 任意 OpenAI 兼容接口）",
     )
     sub = parser.add_subparsers(dest="command", required=True)
