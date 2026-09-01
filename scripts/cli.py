@@ -1,0 +1,278 @@
+"""Unified CLI for multi-provider image generation."""
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# Ensure scripts/ is on sys.path when running as `python scripts/cli.py`
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from providers import get, available
+import config_store
+
+
+# ---------- configure ----------
+
+def cmd_configure(args: argparse.Namespace) -> None:
+    name = args.provider
+    if args.clear:
+        if config_store.clear(name):
+            print(f"已清除 {name} 的配置：{config_store.config_path(name)}")
+        else:
+            print(f"{name} 没有已保存的配置，无需清除。")
+        return
+
+    cfg = config_store.load(name)
+    changed = []
+
+    if args.base_url:
+        cfg["baseUrl"] = args.base_url
+        changed.append("baseUrl")
+
+    api_key = args.api_key
+    if args.update_key:
+        # Interactive entry so the key never lands in shell history
+        try:
+            from getpass import getpass
+            api_key = getpass("请输入 API Key（输入不可见）: ").strip()
+        except Exception:
+            api_key = input("请输入 API Key: ").strip()
+        if not api_key:
+            print("未输入 Key，配置未更改。")
+            return
+
+    if api_key:
+        cfg["apiKey"] = api_key
+        changed.append("apiKey")
+
+    if not changed:
+        print("没有提供要修改的字段。可用：--base-url / --api-key / --update-key / --clear")
+        return
+
+    path = config_store.save(name, cfg)
+    print(f"已保存 {name} 配置（{', '.join(changed)}）→ {path}")
+    print("提示：该文件已在 .gitignore 中，不会进入仓库。")
+
+
+# ---------- doctor ----------
+
+def cmd_doctor(_: argparse.Namespace) -> None:
+    print("配置体检：\n")
+    ok_count = 0
+    for name in available():
+        st = config_store.status(name)
+        flag = "OK  " if st["configured"] else "--  "
+        print(f"  [{flag}] {name}")
+        print(f"        configured : {st['configured']}")
+        if st["keySource"]:
+            print(f"        key source : {st['keySource']}")
+        if st["baseUrl"]:
+            print(f"        base url   : {st['baseUrl']}")
+        print(f"        config file: {st['configPath']}"
+              f"{'' if st['configExists'] else '  (未创建)'}")
+        print()
+        if st["configured"]:
+            ok_count += 1
+
+    print(f"共 {len(available())} 个 provider，{ok_count} 个已配置。")
+    if ok_count == 0:
+        print("\n还没有任何 provider 配置 Key。")
+        print("示例：python scripts/cli.py configure --provider openai "
+              "--base-url https://your-relay/v1 --update-key")
+
+
+# ---------- generate / edit ----------
+
+def _print_result(result) -> None:
+    print(f"已保存: {result.path}")
+    print(f"provider: {result.provider}   model: {result.model}")
+    if result.extra_paths:
+        print(f"其余 {len(result.extra_paths)} 张:")
+        for extra in result.extra_paths:
+            print(f"  - {extra}")
+    if result.usage:
+        print(f"usage: {result.usage}")
+
+
+def _seedream_kwargs(args: argparse.Namespace) -> dict:
+    """Collect Seedream-specific options; ignored by providers that don't accept them."""
+    kw: dict = {}
+    if args.image:
+        kw["image"] = args.image
+    if args.output_format:
+        kw["output_format"] = args.output_format
+    if args.optimize_mode:
+        kw["optimize_mode"] = args.optimize_mode
+    if args.background:
+        kw["background"] = args.background
+    if args.layer_decomposition:
+        kw["layer_decomposition"] = True
+    return kw
+
+
+def cmd_generate(args: argparse.Namespace) -> None:
+    p = get(args.provider)
+    model = args.model or p.default_model
+    size = args.size or p.default_size
+    sdkw = _seedream_kwargs(args)
+
+    if args.dry_run:
+        payload = {
+            "provider": args.provider,
+            "model": model,
+            "prompt": args.prompt,
+            "size": size,
+            "n": args.n,
+            "out": args.out,
+            **sdkw,
+        }
+        print("[dry-run] 将发送以下请求（不会真正调用 API）：")
+        print(__import__("json").dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    result = p.generate(
+        prompt=args.prompt,
+        model=model,
+        size=size,
+        steps=args.steps,
+        seed=args.seed,
+        cfg_scale=args.cfg_scale,
+        neg_prompt=args.neg_prompt,
+        text_mode=args.text_mode,
+        n=args.n,
+        response_format=args.response_format,
+        out=args.out,
+        force=args.force,
+        **sdkw,
+    )
+    _print_result(result)
+
+
+def cmd_edit(args: argparse.Namespace) -> None:
+    p = get(args.provider)
+    model = args.model or p.default_model
+    size = args.size or p.default_size
+
+    if args.dry_run:
+        payload = {
+            "provider": args.provider,
+            "model": model,
+            "image": args.image,
+            "mask": args.mask,
+            "prompt": args.prompt,
+            "size": size,
+            "out": args.out,
+        }
+        print("[dry-run] 将发送以下请求（不会真正调用 API）：")
+        print(__import__("json").dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    result = p.edit(
+        image=Path(args.image),
+        prompt=args.prompt,
+        model=model,
+        size=size,
+        mask=Path(args.mask) if args.mask else None,
+        steps=args.steps,
+        seed=args.seed,
+        cfg_scale=args.cfg_scale,
+        neg_prompt=args.neg_prompt,
+        text_mode=args.text_mode,
+        response_format=args.response_format,
+        out=args.out,
+        force=args.force,
+    )
+    _print_result(result)
+
+
+def cmd_list(_: argparse.Namespace) -> None:
+    print("可用生图厂商：\n")
+    for name in available():
+        p = get(name)
+        print(f"  {name}")
+        print(f"    模型: {', '.join(p.models)}")
+        st = config_store.status(name)
+        print(f"    配置: {'已配置' if st['configured'] else '未配置'}")
+        print()
+
+
+# ---------- parser ----------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="image-gen",
+        description="统一生图 CLI（多厂商，StepFun / Seedream / 任意 OpenAI 兼容接口）",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("list", help="列出可用厂商与配置状态")
+    sub.add_parser("doctor", help="检查各厂商配置状态")
+
+    p_conf = sub.add_parser("configure", help="配置某厂商的 base-url / api-key")
+    p_conf.add_argument("--provider", required=True)
+    p_conf.add_argument("--base-url", default=None, help="OpenAI 兼容 base-url")
+    p_conf.add_argument("--api-key", default=None, help="直接写入 Key（会出现在 shell 历史）")
+    p_conf.add_argument("--update-key", action="store_true", help="交互式输入 Key（推荐）")
+    p_conf.add_argument("--clear", action="store_true", help="清除该厂商配置")
+
+    p_gen = sub.add_parser("generate", help="文生图")
+    p_gen.add_argument("prompt")
+    p_gen.add_argument("--provider", required=True)
+    p_gen.add_argument("--model", default=None)
+    p_gen.add_argument("--size", default=None, help="不填则用该厂商默认尺寸")
+    p_gen.add_argument("--steps", type=int, default=None)
+    p_gen.add_argument("--seed", type=int, default=None)
+    p_gen.add_argument("--cfg-scale", type=float, default=None)
+    p_gen.add_argument("--neg-prompt", default=None)
+    p_gen.add_argument("--text-mode", action="store_true", default=False)
+    p_gen.add_argument("--n", type=int, default=1)
+    p_gen.add_argument("--response-format", default="b64_json")
+    p_gen.add_argument("--image", action="append", default=None,
+                       help="参考图（可多次，本地路径会转 base64；Seedream 图生图/多图生图用）")
+    p_gen.add_argument("--output-format", default=None, choices=["png", "jpeg"],
+                       help="Seedream 输出格式（默认 jpeg）")
+    p_gen.add_argument("--optimize-mode", default=None, choices=["standard", "fast"],
+                       help="Seedream 提示词优化模式")
+    p_gen.add_argument("--background", default=None, choices=["transparent", "opaque"],
+                       help="Seedream 背景（图生图场景，仅 5.0 pro）")
+    p_gen.add_argument("--layer-decomposition", action="store_true", default=False,
+                       help="Seedream 图层拆分（仅 5.0 pro）")
+    p_gen.add_argument("--out", default=None)
+    p_gen.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
+    p_gen.add_argument("--dry-run", action="store_true", help="只打印请求体，不调用 API")
+
+    p_edit = sub.add_parser("edit", help="图编辑")
+    p_edit.add_argument("image")
+    p_edit.add_argument("prompt")
+    p_edit.add_argument("--provider", required=True)
+    p_edit.add_argument("--model", default=None)
+    p_edit.add_argument("--size", default=None, help="不填则用该厂商默认尺寸")
+    p_edit.add_argument("--mask", default=None, help="蒙版图片路径（局部重绘）")
+    p_edit.add_argument("--steps", type=int, default=None)
+    p_edit.add_argument("--seed", type=int, default=None)
+    p_edit.add_argument("--cfg-scale", type=float, default=None)
+    p_edit.add_argument("--neg-prompt", default=None)
+    p_edit.add_argument("--text-mode", action="store_true", default=False)
+    p_edit.add_argument("--response-format", default="b64_json")
+    p_edit.add_argument("--out", default=None)
+    p_edit.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
+    p_edit.add_argument("--dry-run", action="store_true", help="只打印请求体，不调用 API")
+
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    handlers = {
+        "list": cmd_list,
+        "doctor": cmd_doctor,
+        "configure": cmd_configure,
+        "generate": cmd_generate,
+        "edit": cmd_edit,
+    }
+    handlers[args.command](args)
+
+
+if __name__ == "__main__":
+    main()

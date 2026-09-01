@@ -1,0 +1,9 @@
+# 敏感配置与生成产物，不入库
+config/providers/*.json
+# 占位符模板可进 git 作示例；真实配置（.json）仍被忽略
+!config/providers/*.example.json
+output/*
+
+# Python 缓存
+__pycache__/
+*.pyc
