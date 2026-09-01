@@ -100,6 +100,40 @@ def _build_body(
     return body
 
 
+def _ensure_transparent_refs(images: Optional[List[str]]) -> List[str]:
+    """Seedream 5.0 pro `background: transparent` 要求输入图本身带透明通道。
+
+    若传入的本地参考图不透明，自动用内置 rembg(u2netp) 转成透明临时 PNG，
+    使「原生透明生图」流水线开箱即用。已透明的图直接复用，不重复处理。
+    """
+    if not images:
+        return []
+    try:
+        from PIL import Image
+        from rembg import new_session, remove
+    except ImportError:
+        print("提示：未安装 rembg/Pillow，无法自动把参考图转透明；"
+              "请传入已透明的 PNG 或先 `pip install -r requirements.txt`。")
+        return images
+
+    session = new_session("u2netp")
+    out: List[str] = []
+    for img in images:
+        p = Path(img)
+        if not p.exists():
+            out.append(img)  # 当作 URL 透传
+            continue
+        im = Image.open(p)
+        has_alpha = im.mode == "RGBA" and im.getextrema()[-1][0] < 255
+        if has_alpha:
+            out.append(img)
+            continue
+        tmp = p.parent / f".{p.stem}_transparent.png"
+        remove(im.convert("RGB"), session=session).save(tmp)
+        out.append(str(tmp))
+    return out
+
+
 class SeedreamProvider(BaseProvider):
     name = NAME
     models = MODELS
@@ -128,6 +162,9 @@ class SeedreamProvider(BaseProvider):
         **_: Any,
     ) -> ImageResult:
         endpoint = model or _endpoint()
+        # 原生透明生图要求参考图本身透明：自动把不透明参考图转透明
+        if background == "transparent" and image:
+            image = _ensure_transparent_refs(image)
         body = _build_body(
             prompt, endpoint, size, response_format, watermark,
             output_format, image, optimize_mode, background, layer_decomposition,

@@ -162,7 +162,7 @@ Seedream 独有：`--size 2K|1K`，以及下方完整参数表。
 | `--image <路径或URL>` | 参考图，可多次。本地文件自动转 base64；用于图生图 / 多图生图（最多 10 张）。 |
 | `--output-format png\|jpeg` | 输出格式，默认 jpeg。 |
 | `--optimize-mode standard\|fast` | 提示词自动优化模式。 |
-| `--background transparent\|opaque` | 背景透明 / 不透明（仅图生图场景、5.0 pro）。 |
+| `--background transparent\|opaque` | 背景透明 / 不透明（仅图生图场景、5.0 pro）。**transparent 时若参考图不透明，会自动用 rembg 转透明后再调用 API**，实现「同角色 + 原生透明」一条龙。 |
 | `--layer-decomposition` | 图层拆分：返回底图 + 多个图层（仅 5.0 pro）。 |
 
 多图结果（图层拆分 / 多图生图）会**全部落盘**到 `output/`（或 `--out` 指定前缀），主图路径返回、其余打印在下方。
@@ -180,6 +180,11 @@ python scripts/cli.py generate "把这张草图做成精致插画" --provider se
 # Seedream 文生图 + 透明背景 + 提示词优化
 python scripts/cli.py generate "一只透明背景的赛博猫" --provider seedream \
   --background transparent --optimize-mode fast
+
+# Seedream 原生透明生图（参考图角色保持 + 自动透明化 + 原生透明输出）
+# 适用场景：多角度统一角色、需要透明 PNG 直接叠到 UI 上
+python scripts/cli.py generate "Same character, repose to left side view" --provider seedream \
+  --image front_character.png --background transparent --output-format png --out left.png
 ```
 
 ## 接新厂商：两条路
