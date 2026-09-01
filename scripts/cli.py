@@ -111,8 +111,29 @@ def _seedream_kwargs(args: argparse.Namespace) -> dict:
     return kw
 
 
+def _check_deps(p) -> None:
+    """Abort early with a clear install hint if a provider's deps are missing.
+
+    Mirrors api2img's fail-fast philosophy: surface the missing-package problem
+    before doing any work, with the exact command to fix it.
+    """
+    missing = []
+    for pkg in getattr(p, "required_packages", []):
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        raise SystemExit(
+            f"缺少依赖：{', '.join(missing)}\n"
+            f"请先安装：pip install -r requirements.txt\n"
+            f"（或：pip install {' '.join(missing)}）"
+        )
+
+
 def cmd_generate(args: argparse.Namespace) -> None:
     p = get(args.provider)
+    _check_deps(p)
     model = args.model or p.default_model_for_call()
     size = args.size or p.default_size
     sdkw = _seedream_kwargs(args)
@@ -151,6 +172,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
 
 def cmd_edit(args: argparse.Namespace) -> None:
     p = get(args.provider)
+    _check_deps(p)
     model = args.model or p.default_model_for_call()
     size = args.size or p.default_size
 

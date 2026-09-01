@@ -21,6 +21,9 @@ class BaseProvider(ABC):
     models: list[str] = []
     default_model: str = ""
     default_size: str = "1024x1024"
+    # Third-party packages this provider's runtime needs (import names).
+    # Empty = stdlib only (e.g. Seedream uses urllib). Used by cli._check_deps.
+    required_packages: list[str] = []
 
     @abstractmethod
     def generate(self, prompt: str, **kwargs: Any) -> ImageResult:

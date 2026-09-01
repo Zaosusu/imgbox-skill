@@ -73,6 +73,7 @@ class StepFunProvider(BaseProvider):
     models = MODELS
     default_model = DEFAULT_MODEL
     default_size = "1024x1024"
+    required_packages = ["openai", "httpx"]
     BASE_URL = BASE_URL
 
     def generate(

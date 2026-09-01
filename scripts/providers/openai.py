@@ -70,6 +70,7 @@ class OpenAICompatProvider(BaseProvider):
     models = ["gpt-image-1", "dall-e-3", "dall-e-2"]
     default_model = DEFAULT_MODEL
     default_size = "1024x1024"
+    required_packages = ["openai", "httpx"]
 
     def generate(
         self,

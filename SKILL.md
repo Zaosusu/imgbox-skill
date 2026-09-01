@@ -28,11 +28,13 @@ description: >
 
 ## 开箱即用（3 步）
 
-### 1. 装依赖（只 stepfun / openai 需要）
+### 1. 装依赖（只 stepfun / openai 需要；seedream 零依赖）
 
 ```bash
-pip install openai httpx
+pip install -r requirements.txt
 ```
+
+> 缺依赖时 `generate` / `edit` 会直接报错并提示这条安装命令，无需手动排查。
 
 ### 2. 配置（关键一步）
 
