@@ -86,6 +86,31 @@ python scripts/cli.py removebg photo.png --out photo_nobg.png
 python scripts/cli.py removebg a.png b.png c.png --out nobg/          # 批量抠图到目录
 ```
 
+## 生图后可选抠图（removebg 一条龙）
+
+生图（或图编辑）完成后，**用户可以选择顺手抠图**，无需另开命令：
+三档选择机制（按运行环境自动适配，绝不阻塞）：
+
+1. **显式 flag**：`generate ... --removebg` → 生图后自动对每张结果跑本地 U²-Net 抠图，
+   输出 `<原名>_nobg.png`（透明 PNG），**不覆盖原图**。可加 `--removebg-model u2netp` 换模型。
+2. **交互终端询问**：在真实终端（TTY）里跑 `generate` 且没加 `--removebg` 时，
+   会问一句「是否对刚生成的图片去除背景（抠图）？[y/N]」，输入 y 即抠。
+3. **非交互只提示**：Agent / 管道等非 TTY 环境不询问，仅在结尾打印一行
+   `提示：如需去除背景（抠图），可运行 python scripts/cli.py removebg <路径>`，把选择权交给你。
+
+```bash
+# 生图并直接抠图（一条命令出透明 PNG）
+python scripts/cli.py generate "一只广交会吉祥物" --provider seedream --removebg
+
+# 等价的两步（手动）：先生图、再抠图
+python scripts/cli.py generate "一只广交会吉祥物" --provider seedream --out mascot.jpeg
+python scripts/cli.py removebg mascot.jpeg
+```
+
+> 抠图是**本地运行**（rembg + U²-Net），不消耗 API、不上传图片、无额外费用。
+> 与 Seedream `--background transparent` 原生透明不同：本功能是对**已生成的任意图片**后处理抠图，
+> 两者互补——需要「同角色 + 原生透明」用 `--background transparent`，只是想给现有图去背景就用 `--removebg`。
+
 ## 隐私：上传用户图片前必须确认
 
 编辑/修改会**把用户图片上传到第三方 API**。在第一次执行 `edit` 前，
@@ -139,7 +164,7 @@ Avoid: no watermark, no unintended text
 python scripts/cli.py list                      # 列出厂商 + 模型 + 配置状态
 python scripts/cli.py doctor                    # 配置体检
 python scripts/cli.py configure --provider <名> [--base-url <url>] [--api-key <k>] [--update-key] [--clear]
-python scripts/cli.py generate "<prompt>" --provider <名> [--model] [--size] [--out] [--dry-run]
+python scripts/cli.py generate "<prompt>" --provider <名> [--model] [--size] [--out] [--removebg] [--removebg-model u2netp] [--dry-run]
 python scripts/cli.py edit "<图>" "<prompt>" --provider <名> [--mask <蒙版>] [--out] [--dry-run]
 python scripts/cli.py removebg <图片> [--model u2netp] [--out] [--force]   # AI 抠图
 ```

@@ -171,6 +171,20 @@ def cmd_generate(args: argparse.Namespace) -> None:
     )
     _print_result(result)
 
+    # 生图后抠图：显式 --removebg 直接跑；交互终端下询问；否则只给提示（不阻塞）
+    if getattr(args, "removebg", False):
+        _auto_removebg_after_generate(result, args)
+    elif sys.stdin.isatty():
+        try:
+            ans = input("是否对刚生成的图片去除背景（抠图）？[y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = ""
+        if ans in ("y", "yes", "是"):
+            _auto_removebg_after_generate(result, args)
+    else:
+        print("提示：如需去除背景（抠图），可运行 "
+              f"python scripts/cli.py removebg {result.path}")
+
 
 def cmd_edit(args: argparse.Namespace) -> None:
     p = get(args.provider)
@@ -220,8 +234,11 @@ def _resolve_removebg_out(out: "str | None", p: Path, n: int) -> Path:
     return p.parent / f"{p.stem}_nobg.png"
 
 
-def cmd_removebg(args: argparse.Namespace) -> None:
-    """AI 抠图：基于 U²-Net（rembg）去除背景，输出带透明通道的 PNG。"""
+def _run_removebg(image_paths, model="u2netp", out=None, force=False):
+    """AI 抠图：基于 U²-Net（rembg）去除背景，输出带透明通道的 PNG。
+
+    可复用：命令行 removebg 子命令与「生图后自动抠图」共用同一逻辑。
+    """
     try:
         from PIL import Image
         from rembg import new_session, remove
@@ -237,24 +254,47 @@ def cmd_removebg(args: argparse.Namespace) -> None:
     if local_model.exists():
         os.environ.setdefault("U2NET_HOME", str(skill_root))
 
-    model = args.model or "u2netp"
     try:
         session = new_session(model)
     except Exception as e:
         raise SystemExit(f"加载 rembg 模型失败（{model}）：{e}")
-    inputs = args.image
-    for img_path in inputs:
+
+    saved = []
+    for img_path in image_paths:
         p = Path(img_path)
         if not p.exists():
             print(f"跳过（文件不存在）: {img_path}")
             continue
         im = Image.open(p).convert("RGB")
         out_im = remove(im, session=session)  # 返回带 alpha 的 PIL.Image (RGBA)
-        out_path = _resolve_removebg_out(args.out, p, len(inputs))
-        guard_overwrite(out_path, args.force)
+        out_path = _resolve_removebg_out(out, p, len(image_paths))
+        guard_overwrite(out_path, force)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_im.save(out_path)
         print(f"已保存: {out_path}  (model: {model})")
+        saved.append(out_path)
+    return saved
+
+
+def _auto_removebg_after_generate(result, args) -> None:
+    """生图后自动抠图：收集所有输出路径，对每张跑 removebg。
+
+    生图流程里 out 通常已指向原图，故抠图结果一律输出为 <stem>_nobg.png，
+    不覆盖原图。
+    """
+    paths = [result.path] + (result.extra_paths or [])
+    print("\n── 自动抠图（去除背景）──")
+    _run_removebg(
+        paths,
+        model=getattr(args, "removebg_model", None) or "u2netp",
+        out=None,
+        force=args.force,
+    )
+
+
+def cmd_removebg(args: argparse.Namespace) -> None:
+    """AI 抠图：基于 U²-Net（rembg）去除背景，输出带透明通道的 PNG。"""
+    _run_removebg(args.image, model=args.model or "u2netp", out=args.out, force=args.force)
 
 
 def cmd_list(_: argparse.Namespace) -> None:
@@ -311,6 +351,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Seedream 图层拆分（仅 5.0 pro）")
     p_gen.add_argument("--out", default=None)
     p_gen.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
+    p_gen.add_argument("--removebg", action="store_true", default=False,
+                       help="生图后自动去除背景（抠图），输出透明 PNG（<原名>_nobg.png）")
+    p_gen.add_argument("--removebg-model", default="u2netp",
+                       help="抠图模型名，默认 u2netp（skill 已内置轻量小模型）")
     p_gen.add_argument("--dry-run", action="store_true", help="只打印请求体，不调用 API")
 
     p_edit = sub.add_parser("edit", help="图编辑")
