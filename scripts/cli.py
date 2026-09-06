@@ -110,7 +110,10 @@ def _seedream_kwargs(args: argparse.Namespace) -> dict:
         kw["background"] = args.background
     if args.layer_decomposition:
         kw["layer_decomposition"] = True
-    if getattr(args, "no_watermark", False):
+    if getattr(args, "watermark", False):
+        kw["watermark"] = True
+    else:
+        # 默认无水印（--no-watermark 老 flag 仍兼容，效果等价于默认）
         kw["watermark"] = False
     return kw
 
@@ -351,8 +354,10 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Seedream 背景（图生图场景，仅 5.0 pro）")
     p_gen.add_argument("--layer-decomposition", action="store_true", default=False,
                        help="Seedream 图层拆分（仅 5.0 pro）")
+    p_gen.add_argument("--watermark", action="store_true", default=False,
+                       help="Seedream 开启「AI生成」水印（默认无水印）")
     p_gen.add_argument("--no-watermark", action="store_true", default=False,
-                       help="Seedream 关闭「AI生成」水印（默认带水印）")
+                       help="（已废弃，默认即无水印）保留兼容旧命令")
     p_gen.add_argument("--out", default=None)
     p_gen.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
     p_gen.add_argument("--removebg", action="store_true", default=False,

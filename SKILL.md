@@ -201,7 +201,7 @@ Seedream 独有：`--size 2K|1K`，以及下方完整参数表。
 - prompt 不要堆砌 200 字约束：长 prompt 会让 seedream 抓不住重点，常见表现是中文字被吞/缩水（例如"24小时"变成"24时"）。
 - 如果追求清晰中文大字，优先用单图 + 极简 prompt；需要风格一致性时，靠 prompt 里的颜色和版式关键词控制，而不是再塞一张风格图。
 - 2K 出图时，用 `--response-format url` 避免 `b64_json` 大响应被网络截断（`IncompleteRead` / SSL EOF）。
-- 需要无水印输出时加 `--no-watermark`。
+- **默认无水印**：Seedream 默认关闭「AI生成」水印，无需额外参数；如需加水印加 `--watermark`。`--no-watermark` 保留兼容老命令。
 
 ## 通用参数
 
