@@ -102,6 +102,34 @@ python scripts/cli.py poster --title "不是下载器" --subtitle "是内容工�
 python scripts/cli.py poster   --title "大标题"   --subtitle "副标题"   --items "标签1:描述文字" "标签2:描述文字"   --footer "底部品牌名"   --style "科技感深蓝紫 dark mode，数字光流粒子"   --ratio "3:4"   --provider seedream   --force
 ```
 
+### ★ 出图后必须自检：文字到底上没上去
+
+**不要出完图就直接交付。** 文生图模型偶发「只出背景、不出文字」或「文字串行、缺字」，
+必须亲眼验一遍再给用户（这是踩过的坑：曾连出多版纯背景图被用户当场抓包）。
+
+标准自检动作（把 6 张缩成一个总览图，一次看完，省 token）：
+
+```python
+from PIL import Image
+from pathlib import Path
+names = ["poster_01", "poster_02", "poster_03"]
+w, h = 340, 604                     # 9:16 缩略尺寸
+sheet = Image.new("RGB", (w*len(names)+20, h+20), (24,24,28))
+for i, n in enumerate(names):
+    im = Image.open(f"{n}.png").convert("RGB").resize((w, h), Image.LANCZOS)
+    sheet.paste(im, (10+i*(w+10), 10))
+sheet.save("/tmp/poster_sheet.png")  # 缩略图写临时目录，别落在工作区
+```
+
+然后逐条核对：
+1. **大标题 / 副标题在不在**，字有没有缺笔画、错字、乱码；
+2. **每一条 `--items` 是否都出现了**（模型有时会漏掉中间某条）；
+3. **有没有模型自己加戏** —— 它常自作主张补一列解释小字、加标语、加数字。
+   文案要严格可控时，加 `--strict-text`（会向模型声明「只显示以上文字，不要添加任何其他文字」）；
+4. 最挤的那张（条目最多）单独放大裁切再确认一遍。
+
+**发现漏字或加戏 → 直接重跑那张**，不要靠修图补字。
+
 ## 生图后可选抠图（removebg 一条龙）
 
 生图（或图编辑）完成后，**用户可以选择顺手抠图**，无需另开命令：

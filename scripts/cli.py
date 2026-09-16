@@ -338,6 +338,8 @@ def cmd_poster(args: argparse.Namespace) -> None:
 
     parts.append(f"底部：{args.footer or args.title}")
     parts.append("整体深色背景浅色文字，所有中文文字必须清晰可读，间距合理。")
+    if getattr(args, "strict_text", False):
+        parts.append("只显示以上文字，不要添加任何其他文字、标语、说明或装饰性文字。")
 
     prompt = " ".join(parts)
 
@@ -447,6 +449,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_poster.add_argument("--provider", default="seedream", help="生图厂商（默认 seedream）")
     p_poster.add_argument("--model", default=None, help="模型名（默认用该厂商的 default）")
     p_poster.add_argument("--out", default=None, help="输出路径")
+    p_poster.add_argument("--strict-text", action="store_true",
+                          help="严格只出给定文案，禁止模型自行补充任何文字")
     p_poster.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
 
     return parser
