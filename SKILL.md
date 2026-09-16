@@ -86,6 +86,22 @@ python scripts/cli.py removebg photo.png --out photo_nobg.png
 python scripts/cli.py removebg a.png b.png c.png --out nobg/          # 批量抠图到目录
 ```
 
+### 4. 生成竖版海报（带嵌入式中文文字）
+
+**核心原则**：文字内容必须一次性放进 prompt 传给模型，不能分两步（先生背景、再叠文字）。
+这是此前踩过的坑——背景生成了再 PIL 叠文字，效果远不如一次性传给 Seedream。
+
+```bash
+# 基础用法（默认 3:4、seedream）
+python scripts/cli.py poster --title "MCN Studio Skill" --subtitle "内容运营全自动化流水线"   --items "采集:5平台 下载+转写+评论+数据" "分析:Agent爆款拆解 情绪曲线 仿写同款"   --footer "MCN Studio Skill"
+
+# 9:16 海报（适合手机端分享）
+python scripts/cli.py poster --title "不是下载器" --subtitle "是内容工厂"   --items "纯Python实现:30+脚本 零第三方依赖" "零浏览器自动化:项目Firefox读Cookie 不封号"   --style "赛博朋克金色光效 dark mode" --ratio "9:16" --force
+
+# 全参数
+python scripts/cli.py poster   --title "大标题"   --subtitle "副标题"   --items "标签1:描述文字" "标签2:描述文字"   --footer "底部品牌名"   --style "科技感深蓝紫 dark mode，数字光流粒子"   --ratio "3:4"   --provider seedream   --force
+```
+
 ## 生图后可选抠图（removebg 一条龙）
 
 生图（或图编辑）完成后，**用户可以选择顺手抠图**，无需另开命令：
@@ -252,7 +268,7 @@ imgbox-skill/
 │       ├── seedream.json            # ← 你的 Key（不进 git，configure 生成）
 │       └── openai.json             # ← base-url + Key（不进 git，configure 生成）
 ├── scripts/
-│   ├── cli.py               # 统一入口：list / doctor / configure / generate / edit / removebg
+│   ├── cli.py               # 统一入口：list / doctor / configure / generate / edit / removebg / poster
 │   ├── config_store.py      # 配置读写 + 占位符检测
 │   └── providers/
 │       ├── base.py          # 抽象基类

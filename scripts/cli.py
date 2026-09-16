@@ -313,6 +313,50 @@ def cmd_list(_: argparse.Namespace) -> None:
         print()
 
 
+# ---------- poster ----------
+
+RATIO_SIZES = {"3:4": "1080x1440", "9:16": "1080x1920", "1:1": "1024x1024"}
+
+def cmd_poster(args: argparse.Namespace) -> None:
+    """生成带嵌入式中文文字的竖版海报——一次性把文案传给模型，不拆成背景+叠文字。
+
+    核心教训：文字内容必须放在 prompt 里一起发给文生图模型，不能先生成背景再叠文字。
+    """
+    ratio = args.ratio
+    size = RATIO_SIZES.get(ratio, args.custom_size or "1080x1440")
+
+    # 构建单条完整 prompt
+    parts = [f"竖版海报{ratio}比例{size}，{args.style}。"]
+    parts.append(f"海报上必须清晰显示以下文字：顶部大字「{args.title}」")
+    if args.subtitle:
+        parts.append(f"副标题「{args.subtitle}」")
+
+    if args.items:
+        parts.append("中部列表：")
+        for item in args.items:
+            parts.append(f"· {item}")
+
+    parts.append(f"底部：{args.footer or args.title}")
+    parts.append("整体深色背景浅色文字，所有中文文字必须清晰可读，间距合理。")
+
+    prompt = " ".join(parts)
+
+    # 调用指定 provider
+    p = get(args.provider)
+    _check_deps(p)
+    model = args.model or p.default_model_for_call()
+
+    result = p.generate(
+        prompt=prompt,
+        model=model,
+        size=size,
+        out=args.out,
+        force=args.force,
+        watermark=False,
+    )
+    _print_result(result)
+
+
 # ---------- parser ----------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -390,6 +434,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_rm.add_argument("--out", default=None, help="输出路径；多张时作为输出目录")
     p_rm.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
 
+    p_poster = sub.add_parser("poster", help="生成带嵌入式中文文字的竖版海报（文字随 prompt 一起传给模型）")
+    p_poster.add_argument("--title", required=True, help="海报大标题")
+    p_poster.add_argument("--subtitle", default=None, help="副标题")
+    p_poster.add_argument("--items", nargs="*", default=None, help="中部列表项，每项一条引号包裹")
+    p_poster.add_argument("--footer", default=None, help="底部文字（默认同标题）")
+    p_poster.add_argument("--style", default="科技感深蓝紫 dark mode，极简留白",
+                          help="风格描述，如「科技感深蓝紫 dark mode」「赛博朋克金色光效」")
+    p_poster.add_argument("--ratio", default="3:4", choices=["3:4", "9:16", "1:1"],
+                          help="画面比例（默认 3:4）")
+    p_poster.add_argument("--custom-size", default=None, help="自定义尺寸（如 1024x1024），覆盖 --ratio")
+    p_poster.add_argument("--provider", default="seedream", help="生图厂商（默认 seedream）")
+    p_poster.add_argument("--model", default=None, help="模型名（默认用该厂商的 default）")
+    p_poster.add_argument("--out", default=None, help="输出路径")
+    p_poster.add_argument("--force", action="store_true", help="允许覆盖已存在的输出文件")
+
     return parser
 
 
@@ -402,6 +461,7 @@ def main() -> None:
         "generate": cmd_generate,
         "edit": cmd_edit,
         "removebg": cmd_removebg,
+        "poster": cmd_poster,
     }
     handlers[args.command](args)
 
